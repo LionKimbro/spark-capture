@@ -1,0 +1,6 @@
+spark-capture.conversations
+=========================
+
+first-idea-and-development
+  url: https://chatgpt.com/c/6a239e60-a174-83e8-9811-c8bacfcda9cb
+  note: Conversation where the spark-capture idea was first had and developed.

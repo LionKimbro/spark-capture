@@ -1,0 +1,262 @@
+{
+  "document": {
+    "document-id": "spark-capture.first-draft-data-format.v1",
+    "title": "Spark Capture First-Draft Data Format",
+    "tags": [
+      "spark-capture",
+      "json",
+      "data-format",
+      "softspec",
+      "documentation"
+    ],
+    "purpose": "Describe the first-draft JSON data format written by the spark-capture tool.",
+    "author": [
+      "Lion Kimbro",
+      "Codex"
+    ],
+    "status": "draft",
+    "created": "2026-06-06"
+  },
+  "overview": {
+    "summary": "Each spark is stored as one pretty-printed JSON file named <uuid>.json inside the sparks folder below the machine-root database directory.",
+    "storage-path-shape": "<db-root>/sparks/<uuid>.json",
+    "top-level-wrapper": {
+      "type": "spark-capture",
+      "version": "1.0",
+      "data": "{...spark payload...}"
+    }
+  },
+  "design-notes": [
+    "This is a pragmatic first draft, intended to stay easy to read and edit by hand.",
+    "The payload keeps familiar string fields and a few repeated list structures.",
+    "Dates are descriptive strings; only some fields are expected to usually use yyyy-mm-dd."
+  ],
+  "softspec": {
+    "types": {
+      "uuid": {
+        "type": "string",
+        "semantic_type": "uuid",
+        "description": "A hyphenated UUID string.",
+        "examples": [
+          "550e8400-e29b-41d4-a716-446655440000"
+        ]
+      },
+      "short-tag": {
+        "type": "string",
+        "semantic_type": "tag",
+        "description": "A short tag token, typically entered in a whitespace-separated tag list.",
+        "examples": [
+          "python",
+          "tkinter",
+          "idea"
+        ]
+      },
+      "known-record": {
+        "type": "object",
+        "description": "A known external record or clue related to the spark.",
+        "keys": {
+          "date-recorded": {
+            "type": "string",
+            "description": "Usually yyyy-mm-dd, but stored as descriptive text."
+          },
+          "location": {
+            "type": "string",
+            "description": "Any location hint, filepath, URL, or textual instruction."
+          },
+          "hook": {
+            "type": "string",
+            "description": "A short note about why the record matters."
+          }
+        },
+        "additional_keys": false
+      },
+      "conversation-record": {
+        "type": "object",
+        "keys": {
+          "url": {
+            "type": "string",
+            "semantic_type": "url",
+            "description": "A conversation URL."
+          },
+          "hook": {
+            "type": "string",
+            "description": "A short note about the linked conversation."
+          }
+        },
+        "additional_keys": false
+      },
+      "related-project-record": {
+        "type": "object",
+        "keys": {
+          "project": {
+            "type": "string",
+            "description": "A UUID or UUID prefix referring to another spark or related project."
+          }
+        },
+        "additional_keys": false
+      }
+    },
+    "schemas": {
+      "spark-file": {
+        "title": "spark-capture wrapper file",
+        "description": "The full JSON file written by spark-capture.",
+        "structure": {
+          "type": "object",
+          "keys": {
+            "type": {
+              "type": "string",
+              "required": true,
+              "description": "Fixed wrapper type name.",
+              "examples": [
+                "spark-capture"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "required": true,
+              "examples": [
+                "1.0"
+              ]
+            },
+            "data": {
+              "ref": "spark-payload",
+              "required": true
+            }
+          },
+          "additional_keys": false
+        }
+      },
+      "spark-payload": {
+        "title": "spark payload",
+        "description": "The body of a captured spark.",
+        "structure": {
+          "type": "object",
+          "keys": {
+            "uuid": {
+              "ref": "uuid",
+              "required": true
+            },
+            "title": {
+              "type": "string",
+              "required": true,
+              "description": "Human title of the spark."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "ref": "short-tag"
+              },
+              "description": "Whitespace-split tags from the editor field."
+            },
+            "hook": {
+              "type": "string",
+              "description": "Short one-line orientation hook."
+            },
+            "date-recorded": {
+              "type": "string",
+              "description": "Usually today's local date in yyyy-mm-dd form."
+            },
+            "date-conceived": {
+              "type": "string",
+              "description": "Free-form conceived date or time phrase."
+            },
+            "status": {
+              "type": "string",
+              "vocabulary": {
+                "conceived": "Default state for a fresh spark.",
+                "repo created": "A repository has been created for it.",
+                "formalized": "The spark has meaningfully grown beyond the early stage."
+              }
+            },
+            "graduated-to": {
+              "type": "string",
+              "description": "A note describing where the spark went next."
+            },
+            "known-records": {
+              "type": "array",
+              "items": {
+                "ref": "known-record"
+              }
+            },
+            "synopsis": {
+              "type": "string"
+            },
+            "why-it-matters": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "related": {
+              "type": "string",
+              "description": "Free-form note about related things."
+            },
+            "repo-path": {
+              "type": "string",
+              "description": "Repository path or repository URL."
+            },
+            "folder-path": {
+              "type": "string",
+              "description": "Folder path associated with the spark."
+            },
+            "conversations": {
+              "type": "array",
+              "items": {
+                "ref": "conversation-record"
+              }
+            },
+            "related-projects": {
+              "type": "array",
+              "items": {
+                "ref": "related-project-record"
+              }
+            }
+          },
+          "additional_keys": false
+        }
+      }
+    }
+  },
+  "example": {
+    "type": "spark-capture",
+    "version": "1.0",
+    "data": {
+      "uuid": "550e8400-e29b-41d4-a716-446655440000",
+      "title": "spark capture",
+      "tags": [
+        "tkinter",
+        "cli",
+        "ideas"
+      ],
+      "hook": "tiny form for catching project sparks",
+      "date-recorded": "2026-06-06",
+      "date-conceived": "Spring, 2026",
+      "status": "conceived",
+      "graduated-to": "",
+      "known-records": [
+        {
+          "date-recorded": "2026-06-06",
+          "location": "F:/repo/spark-capture",
+          "hook": "initial repo"
+        }
+      ],
+      "synopsis": "Capture tiny project sparks before they drift away.",
+      "why-it-matters": "It keeps small living ideas easy to save.",
+      "notes": "First draft format.",
+      "related": "Could later feed other project systems.",
+      "repo-path": "F:/repo/spark-capture",
+      "folder-path": "F:/repo/lions-db/sparks",
+      "conversations": [
+        {
+          "url": "https://chatgpt.com/c/6a239e60-a174-83e8-9811-c8bacfcda9cb",
+          "hook": "first idea conversation"
+        }
+      ],
+      "related-projects": [
+        {
+          "project": "550e8400"
+        }
+      ]
+    }
+  }
+}
