@@ -1,0 +1,13 @@
+{
+  "zookeep-project-guid": "9d863007-1964-4130-a99e-1773905c17f2",
+  "name": "spark-capture",
+  "repo-type": "python-2026-03",
+  "license": "CC0-1.0",
+  "repository": {
+    "name": "spark-capture",
+    "visibility": "public"
+  },
+  "python-package": {
+    "name": "sparkcapture"
+  }
+}
