@@ -24,15 +24,7 @@ DB_ROOT_KEYS = [
     "db-root2026",
 ]
 
-g = {
-    "active-uuid": None,
-    "generated-uuid": None,
-    "known-record-rows": [],
-    "known-record-section": None,
-    "known-record-button": None,
-    "conversation-rows": [],
-    "related-project-rows": [],
-}
+REFRESH_MS = 10000
 
 
 def main():
@@ -48,13 +40,15 @@ def main():
     app.describe_key("n", "Number of recent sparks to list.")
     app.describe_key("tag", "Tag used by the tagged command.")
 
-    app.declare_cmd("", cmd_open_editor)
+    app.declare_cmd("", cmd_show_browser)
+    app.declare_cmd("new", cmd_open_editor)
     app.declare_cmd("setup", cmd_setup)
     app.declare_cmd("delete", cmd_delete)
     app.declare_cmd("list", cmd_list_recent)
     app.declare_cmd("tagged", cmd_tagged)
 
-    app.describe_cmd("", "Open the spark capture form.")
+    app.describe_cmd("", "Open the spark browser window.")
+    app.describe_cmd("new", "Open the spark capture form.")
     app.describe_cmd("setup", "Create the sparks folder inside the configured database root.")
     app.describe_cmd("delete", "Delete a spark by UUID or UUID prefix.")
     app.describe_cmd("list", "List the most recently modified sparks.")
@@ -117,6 +111,11 @@ def cmd_tagged():
         print(f"{title} {short_uuid(payload['uuid'])} -- {hook}")
 
 
+def cmd_show_browser():
+    sparks_dir = require_sparks_dir()
+    run_browser(sparks_dir)
+
+
 def cmd_open_editor():
     sparks_dir = require_sparks_dir()
     existing_data = None
@@ -127,21 +126,87 @@ def cmd_open_editor():
     run_editor(existing_data, sparks_dir)
 
 
-def run_editor(existing_data, sparks_dir):
-    g["generated-uuid"] = str(uuid.uuid4())
-    g["active-uuid"] = existing_data["uuid"] if existing_data else g["generated-uuid"]
-    today = today_string()
-
+def run_browser(sparks_dir):
     root = Tk()
     root.title("spark")
-    root.geometry("920x980")
+    root.geometry("920x620")
 
-    canvas = create_scroll_canvas(root)
+    frame = ttk.Frame(root, padding=12)
+    frame.pack(fill="both", expand=True)
+    frame.columnconfigure(0, weight=1)
+    frame.rowconfigure(0, weight=1)
+
+    tree = ttk.Treeview(frame, columns=("title", "hook"), show="headings")
+    tree.heading("title", text="Title")
+    tree.heading("hook", text="Hook")
+    tree.column("title", width=280, anchor="w")
+    tree.column("hook", width=560, anchor="w")
+
+    scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+
+    tree.grid(row=0, column=0, sticky="nsew")
+    scrollbar.grid(row=0, column=1, sticky="ns")
+
+    button_row = ttk.Frame(frame)
+    button_row.grid(row=1, column=0, sticky="w", pady=(10, 0))
+    ttk.Button(button_row, text="New", command=lambda: open_editor_window(root, None, sparks_dir, refresh)).pack(side="left")
+    ttk.Button(button_row, text="Refresh", command=lambda: refresh()).pack(side="left", padx=(8, 0))
+
+    def refresh():
+        selection = tree.selection()
+        selected_uuid = selection[0] if selection else None
+        tree.delete(*tree.get_children())
+        for payload in load_spark_payloads(sparks_dir):
+            title = payload.get("title", "").strip() or "(untitled)"
+            hook = payload.get("hook", "").strip()
+            tree.insert("", "end", iid=payload["uuid"], values=(title, hook))
+        if selected_uuid and tree.exists(selected_uuid):
+            tree.selection_set(selected_uuid)
+
+    def open_selected(event=None):
+        selection = tree.selection()
+        if not selection:
+            return
+        spark_path = resolve_spark_path(sparks_dir, selection[0])
+        existing_data = read_json_file(spark_path)["data"]
+        open_editor_window(root, existing_data, sparks_dir, refresh)
+
+    tree.bind("<Double-1>", open_selected)
+    refresh()
+
+    def schedule_refresh():
+        if not root.winfo_exists():
+            return
+        refresh()
+        root.after(REFRESH_MS, schedule_refresh)
+
+    root.after(REFRESH_MS, schedule_refresh)
+    root.mainloop()
+
+
+def run_editor(existing_data, sparks_dir):
+    window = open_editor_window(None, existing_data, sparks_dir)
+    window.mainloop()
+
+
+def open_editor_window(parent, existing_data, sparks_dir, on_save=None):
+    editor_state = build_editor_state(existing_data)
+    today = today_string()
+
+    if parent is None:
+        window = Tk()
+    else:
+        window = tk.Toplevel(parent)
+    window.title("spark")
+    window.geometry("920x980")
+
+    canvas = create_scroll_canvas(window)
     frame = ttk.Frame(canvas, padding=12)
     window_id = canvas.create_window((0, 0), window=frame, anchor="nw")
     frame.columnconfigure(1, weight=1)
 
-    vars_map = build_variables(existing_data, today)
+    vars_map = build_variables(existing_data, today, editor_state)
     widgets = {}
 
     row = 0
@@ -162,7 +227,7 @@ def run_editor(existing_data, sparks_dir):
     add_entry_row(frame, row, "graduated-to", vars_map["graduated-to"], widgets, width=70)
     row += 1
 
-    row = add_known_records_section(frame, row, vars_map["known-records"], today)
+    row = add_known_records_section(frame, row, vars_map["known-records"], today, editor_state)
     row = add_text_row(frame, row, "synopsis", widgets, existing_data, height=3)
     row = add_text_row(frame, row, "why-it-matters", widgets, existing_data, height=3)
     row = add_text_row(frame, row, "notes", widgets, existing_data, height=4)
@@ -171,19 +236,19 @@ def run_editor(existing_data, sparks_dir):
     row += 1
     row = add_folder_path_row(frame, row, "folder-path", vars_map["folder-path"], widgets)
     row += 1
-    row = add_conversations_section(frame, row, vars_map["conversations"])
-    row = add_related_projects_section(frame, row, vars_map["related-projects"])
+    row = add_conversations_section(frame, row, vars_map["conversations"], editor_state)
+    row = add_related_projects_section(frame, row, vars_map["related-projects"], editor_state)
 
     save_button = ttk.Button(
         frame,
         text="Save",
-        command=lambda: save_current_spark(root, widgets, vars_map, sparks_dir),
+        command=lambda: save_current_spark(window, widgets, vars_map, sparks_dir, editor_state, on_save),
     )
     save_button.grid(row=row, column=0, sticky="w", pady=(14, 18))
 
     frame.bind("<Configure>", lambda event: sync_canvas(canvas, window_id, event))
-    root.bind_all("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
-    root.mainloop()
+    window.bind("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
+    return window
 
 
 def create_scroll_canvas(root):
@@ -204,11 +269,24 @@ def sync_canvas(canvas, window_id, event):
     canvas.itemconfigure(window_id, width=event.width)
 
 
-def build_variables(existing_data, today):
+def build_editor_state(existing_data):
+    generated_uuid = str(uuid.uuid4())
+    active_uuid = existing_data["uuid"] if existing_data else generated_uuid
+    return {
+        "active-uuid": active_uuid,
+        "generated-uuid": generated_uuid,
+        "known-record-rows": [],
+        "known-record-button": None,
+        "conversation-rows": [],
+        "related-project-rows": [],
+    }
+
+
+def build_variables(existing_data, today, editor_state):
     data = existing_data or {}
     record_date = data.get("date-recorded", today)
 
-    uuid_value = data.get("uuid", g["active-uuid"])
+    uuid_value = data.get("uuid", editor_state["active-uuid"])
     uuid_display = uuid_value
 
     return {
@@ -278,26 +356,25 @@ def add_folder_path_row(frame, row, label_text, variable, widgets):
     return row
 
 
-def add_known_records_section(frame, row, records, today):
+def add_known_records_section(frame, row, records, today, editor_state):
     ttk.Label(frame, text="known-records").grid(row=row, column=0, sticky="nw", padx=(0, 12), pady=(10, 4))
     section = ttk.Frame(frame)
     section.grid(row=row, column=1, sticky="ew")
     section.columnconfigure(0, weight=1)
-    g["known-record-rows"] = []
-    g["known-record-section"] = section
+    editor_state["known-record-rows"] = []
     for record in records:
-        add_known_record_row(section, record, today)
-    g["known-record-button"] = ttk.Button(
+        add_known_record_row(section, record, today, editor_state)
+    editor_state["known-record-button"] = ttk.Button(
         section,
         text="Add known record",
-        command=lambda: add_known_record_row(section, None, today),
+        command=lambda: add_known_record_row(section, None, today, editor_state),
     )
-    refresh_known_record_button()
+    refresh_known_record_button(editor_state)
     return row + 1
 
 
-def add_known_record_row(section, record, today):
-    index = len(g["known-record-rows"])
+def add_known_record_row(section, record, today, editor_state):
+    index = len(editor_state["known-record-rows"])
     record = record or {"date-recorded": today, "location": "", "hook": ""}
 
     row_frame = ttk.LabelFrame(section, text=f"record {index + 1}", padding=8)
@@ -318,32 +395,32 @@ def add_known_record_row(section, record, today):
     ttk.Entry(row_frame, textvariable=hook_var, width=64).grid(row=2, column=1, columnspan=2, sticky="ew", pady=2)
     row_frame.columnconfigure(1, weight=1)
 
-    g["known-record-rows"].append(
+    editor_state["known-record-rows"].append(
         {
             "date-recorded": date_var,
             "location": location_var,
             "hook": hook_var,
         }
     )
-    refresh_known_record_button()
+    refresh_known_record_button(editor_state)
 
 
-def refresh_known_record_button():
-    if g["known-record-button"] is None:
+def refresh_known_record_button(editor_state):
+    if editor_state["known-record-button"] is None:
         return
-    g["known-record-button"].grid(
-        row=len(g["known-record-rows"]),
+    editor_state["known-record-button"].grid(
+        row=len(editor_state["known-record-rows"]),
         column=0,
         sticky="w",
         pady=(6, 0),
     )
 
 
-def add_conversations_section(frame, row, conversations):
+def add_conversations_section(frame, row, conversations, editor_state):
     ttk.Label(frame, text="conversations").grid(row=row, column=0, sticky="nw", padx=(0, 12), pady=(10, 4))
     section = ttk.Frame(frame)
     section.grid(row=row, column=1, sticky="ew")
-    g["conversation-rows"] = []
+    editor_state["conversation-rows"] = []
     for index, conversation in enumerate(conversations, start=1):
         url_var = StringVar(value=conversation.get("url", ""))
         hook_var = StringVar(value=conversation.get("hook", ""))
@@ -357,17 +434,17 @@ def add_conversations_section(frame, row, conversations):
         )
         ttk.Label(section, text=f"hook {index}").grid(row=(index - 1) * 2 + 1, column=0, sticky="w", pady=2)
         ttk.Entry(section, textvariable=hook_var, width=58).grid(row=(index - 1) * 2 + 1, column=1, columnspan=2, sticky="ew", pady=2)
-        g["conversation-rows"].append({"url": url_var, "hook": hook_var})
+        editor_state["conversation-rows"].append({"url": url_var, "hook": hook_var})
     section.columnconfigure(1, weight=1)
     return row + 1
 
 
-def add_related_projects_section(frame, row, related_projects):
+def add_related_projects_section(frame, row, related_projects, editor_state):
     ttk.Label(frame, text="related-projects").grid(row=row, column=0, sticky="nw", padx=(0, 12), pady=(10, 4))
     section = ttk.Frame(frame)
     section.grid(row=row, column=1, sticky="ew")
     section.columnconfigure(1, weight=1)
-    g["related-project-rows"] = []
+    editor_state["related-project-rows"] = []
     for index, related_project in enumerate(related_projects, start=1):
         project_var = StringVar(value=related_project.get("project", ""))
         ttk.Label(section, text=f"project {index}").grid(row=index - 1, column=0, sticky="w", pady=2)
@@ -378,13 +455,13 @@ def add_related_projects_section(frame, row, related_projects):
             padx=(8, 0),
             pady=2,
         )
-        g["related-project-rows"].append({"project": project_var})
+        editor_state["related-project-rows"].append({"project": project_var})
     return row + 1
 
 
-def save_current_spark(root, widgets, vars_map, sparks_dir):
+def save_current_spark(window, widgets, vars_map, sparks_dir, editor_state, on_save=None):
     try:
-        payload = collect_form_data(widgets, vars_map, sparks_dir)
+        payload = collect_form_data(widgets, vars_map, sparks_dir, editor_state)
     except ValueError as exc:
         messagebox.showerror("spark", str(exc))
         return
@@ -396,12 +473,14 @@ def save_current_spark(root, widgets, vars_map, sparks_dir):
     }
     spark_path = sparks_dir / f"{payload['uuid']}.json"
     spark_path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    if on_save:
+        on_save()
     messagebox.showinfo("spark", f"saved:\n{spark_path}")
-    root.destroy()
+    window.destroy()
 
 
-def collect_form_data(widgets, vars_map, sparks_dir):
-    spark_uuid = resolve_form_uuid(vars_map["uuid"].get().strip(), sparks_dir)
+def collect_form_data(widgets, vars_map, sparks_dir, editor_state):
+    spark_uuid = resolve_form_uuid(vars_map["uuid"].get().strip(), sparks_dir, editor_state)
     data = {
         "uuid": spark_uuid,
         "title": vars_map["title"].get().strip(),
@@ -411,22 +490,22 @@ def collect_form_data(widgets, vars_map, sparks_dir):
         "date-conceived": vars_map["date-conceived"].get().strip(),
         "status": vars_map["status"].get().strip(),
         "graduated-to": vars_map["graduated-to"].get().strip(),
-        "known-records": collect_known_records(),
+        "known-records": collect_known_records(editor_state),
         "synopsis": read_text_widget(widgets["synopsis"]),
         "why-it-matters": read_text_widget(widgets["why-it-matters"]),
         "notes": read_text_widget(widgets["notes"]),
         "related": read_text_widget(widgets["related"]),
         "repo-path": vars_map["repo-path"].get().strip(),
         "folder-path": vars_map["folder-path"].get().strip(),
-        "conversations": collect_conversations(),
-        "related-projects": collect_related_projects(),
+        "conversations": collect_conversations(editor_state),
+        "related-projects": collect_related_projects(editor_state),
     }
     return data
 
 
-def collect_known_records():
+def collect_known_records(editor_state):
     records = []
-    for record in g["known-record-rows"]:
+    for record in editor_state["known-record-rows"]:
         item = {
             "date-recorded": record["date-recorded"].get().strip(),
             "location": record["location"].get().strip(),
@@ -437,9 +516,9 @@ def collect_known_records():
     return records
 
 
-def collect_conversations():
+def collect_conversations(editor_state):
     conversations = []
-    for conversation in g["conversation-rows"]:
+    for conversation in editor_state["conversation-rows"]:
         item = {
             "url": conversation["url"].get().strip(),
             "hook": conversation["hook"].get().strip(),
@@ -449,22 +528,22 @@ def collect_conversations():
     return conversations
 
 
-def collect_related_projects():
+def collect_related_projects(editor_state):
     related_projects = []
-    for related_project in g["related-project-rows"]:
+    for related_project in editor_state["related-project-rows"]:
         project = related_project["project"].get().strip()
         if project:
             related_projects.append({"project": project})
     return related_projects
 
 
-def resolve_form_uuid(value, sparks_dir):
+def resolve_form_uuid(value, sparks_dir, editor_state):
     if not value:
         raise ValueError("uuid is required")
-    if value == g["active-uuid"]:
-        return g["active-uuid"]
-    if g["active-uuid"] and value != short_uuid(g["active-uuid"]) and g["active-uuid"].startswith(value):
-        return g["active-uuid"]
+    if value == editor_state["active-uuid"]:
+        return editor_state["active-uuid"]
+    if editor_state["active-uuid"] and value != short_uuid(editor_state["active-uuid"]) and editor_state["active-uuid"].startswith(value):
+        return editor_state["active-uuid"]
     try:
         return str(uuid.UUID(value))
     except ValueError:
@@ -528,6 +607,13 @@ def read_json_file(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_spark_payloads(sparks_dir):
+    payloads = []
+    for path in sorted(sparks_dir.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+        payloads.append(read_json_file(path)["data"])
+    return payloads
+
+
 def split_tags(value):
     return [tag for tag in value.split() if tag]
 
@@ -569,9 +655,9 @@ def open_related_project(project_uuid):
     if not project_uuid:
         return
     try:
-        subprocess.Popen(["spark", "--uuid", project_uuid])
+        subprocess.Popen(["spark", "new", "--uuid", project_uuid])
     except FileNotFoundError:
-        subprocess.Popen([sys.executable, "-m", "sparkcapture", "--uuid", project_uuid])
+        subprocess.Popen([sys.executable, "-m", "sparkcapture", "new", "--uuid", project_uuid])
 
 
 if __name__ == "__main__":
