@@ -239,12 +239,24 @@ def open_editor_window(parent, existing_data, sparks_dir, on_save=None):
     row = add_conversations_section(frame, row, vars_map["conversations"], editor_state)
     row = add_related_projects_section(frame, row, vars_map["related-projects"], editor_state)
 
-    save_button = ttk.Button(
-        frame,
+    button_row = ttk.Frame(frame)
+    button_row.grid(row=row, column=0, columnspan=2, sticky="w", pady=(14, 18))
+
+    ttk.Button(
+        button_row,
         text="Save",
         command=lambda: save_current_spark(window, widgets, vars_map, sparks_dir, editor_state, on_save),
-    )
-    save_button.grid(row=row, column=0, sticky="w", pady=(14, 18))
+    ).pack(side="left")
+    ttk.Button(
+        button_row,
+        text="Copy to Clipboard",
+        command=lambda: copy_current_spark_to_clipboard(window, widgets, vars_map, sparks_dir, editor_state),
+    ).pack(side="left", padx=(8, 0))
+
+    row += 1
+    status_var = StringVar(value="")
+    ttk.Label(frame, textvariable=status_var, anchor="w").grid(row=row, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+    editor_state["status-var"] = status_var
 
     frame.bind("<Configure>", lambda event: sync_canvas(canvas, window_id, event))
     window.bind("<MouseWheel>", lambda event: canvas.yview_scroll(int(-1 * (event.delta / 120)), "units"))
@@ -279,6 +291,7 @@ def build_editor_state(existing_data):
         "known-record-button": None,
         "conversation-rows": [],
         "related-project-rows": [],
+        "status-var": None,
     }
 
 
@@ -477,6 +490,30 @@ def save_current_spark(window, widgets, vars_map, sparks_dir, editor_state, on_s
         on_save()
     messagebox.showinfo("spark", f"saved:\n{spark_path}")
     window.destroy()
+
+
+def copy_current_spark_to_clipboard(window, widgets, vars_map, sparks_dir, editor_state):
+    try:
+        payload = collect_form_data(widgets, vars_map, sparks_dir, editor_state)
+    except ValueError as exc:
+        messagebox.showerror("spark", str(exc))
+        return
+
+    document = {
+        "type": "spark-capture",
+        "version": "1.0",
+        "data": payload,
+    }
+    text = json.dumps(document, indent=2) + "\n"
+    window.clipboard_clear()
+    window.clipboard_append(text)
+    window.update()
+    set_status(editor_state, "spark JSON copied to clipboard")
+
+
+def set_status(editor_state, message):
+    if editor_state["status-var"] is not None:
+        editor_state["status-var"].set(message)
 
 
 def collect_form_data(widgets, vars_map, sparks_dir, editor_state):
