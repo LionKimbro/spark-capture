@@ -1,0 +1,295 @@
+{
+  "document": {
+    "document-id": "spark-capture.attention-layer.v1",
+    "title": "Spark Capture Attention Layer",
+    "tags": [
+      "spark-capture",
+      "attention",
+      "possibility-reactor",
+      "focus",
+      "project-navigation",
+      "personal-operating-system"
+    ],
+    "purpose": "Describe an attention-capture layer for Spark Capture: a system that preserves many sparks while governing which sparks are allowed to draw active attention, energy, and implementation effort.",
+    "author": [
+      "Lion Kimbro",
+      "Wing-Cat (ChatGPT)"
+    ],
+    "status": "first-draft",
+    "created": "2026-06-07",
+    "chatgpt": "https://chatgpt.com/c/6a2629fb-bed8-83e8-942d-56a88dda6aaa"
+  },
+  "core-insight": {
+    "summary": "The Spark list is not the attention system itself. Spark Capture records possible futures; the Attention Layer governs which of those futures currently have permission to claim focus.",
+    "key-phrase": "Spark catches possibility. Attention governs permission.",
+    "metaphor": "Lion is a 24/7 possibility reactor. Spark Capture is the holding chamber for sparks; the Attention Layer is the reactor vessel, control rod, and routing mechanism that turns possibility into directed work."
+  },
+  "problem": {
+    "description": "A person with many active ideas can become captured by whichever spark feels most vivid in the moment. The danger is not having too many ideas; the danger is when a spark silently promotes itself into command without being consciously chosen.",
+    "symptoms": [
+      "Every spark feels urgent.",
+      "Every branch feels alive.",
+      "Every tool could become a world.",
+      "Every world could become a civilization.",
+      "The maker feels unable to stop because each possibility appears immediately buildable."
+    ],
+    "design-challenge": "Create a lightweight mechanism that lets sparks be honored and preserved without allowing all of them to become active work."
+  },
+  "layer-model": {
+    "principle": "Separate durable idea capture from temporary attention state.",
+    "layers": [
+      {
+        "name": "spark-registry",
+        "question": "What ideas exist?",
+        "responsibility": "Store durable spark records by GUID. Sparks remain valid whether or not they are currently active."
+      },
+      {
+        "name": "attention-layer",
+        "question": "What ideas are allowed to pull on me right now?",
+        "responsibility": "Store ordered references to spark GUIDs and assign each referenced spark an attention role."
+      },
+      {
+        "name": "work-session-log",
+        "question": "What am I doing in this sitting?",
+        "responsibility": "Record the active session, current intention, notes, interruptions, decisions, and next return point."
+      },
+      {
+        "name": "project-folder",
+        "question": "Where does implementation live?",
+        "responsibility": "Contain the actual files, code, artifacts, and project-specific records for work that has graduated from spark into build."
+      }
+    ]
+  },
+  "attention-stack": {
+    "description": "The Attention Layer may be represented as an ordered stack of spark GUID references. The order represents current attention priority, not permanent importance.",
+    "rule": "Only one spark should occupy the active forge position at a time.",
+    "roles": [
+      {
+        "role": "forge",
+        "meaning": "The one active build. This spark is allowed to draw implementation energy now.",
+        "limit": 1
+      },
+      {
+        "role": "support",
+        "meaning": "A spark that may be consulted or advanced only insofar as it directly supports the forge.",
+        "limit": "small"
+      },
+      {
+        "role": "watcher",
+        "meaning": "A spark that is emotionally or intellectually loud, but not currently actionable.",
+        "limit": "flexible"
+      },
+      {
+        "role": "parked",
+        "meaning": "A captured spark that is explicitly not allowed to draw active work today.",
+        "limit": "unlimited"
+      }
+    ],
+    "alternative-simple-lanes": [
+      "now",
+      "next",
+      "later",
+      "not-today"
+    ]
+  },
+  "attention-capture-mechanism": {
+    "description": "When a spark tries to seize attention, the system should make the promotion explicit. Capturing attention is not the same as starting work.",
+    "trigger": "The user notices that a spark is pulling attention, energy, urgency, or emotional charge.",
+    "ritual-question": "Why is this trying to capture attention?",
+    "smallest-safe-capture-options": [
+      {
+        "option": "add-note-only",
+        "meaning": "Append the thought to the spark without changing its attention status."
+      },
+      {
+        "option": "put-in-parking-lot",
+        "meaning": "Acknowledge the spark and explicitly mark it as not active."
+      },
+      {
+        "option": "promote-to-support",
+        "meaning": "Allow the spark to support the current forge, but not displace it."
+      },
+      {
+        "option": "promote-to-forge",
+        "meaning": "Make the spark the one active build, displacing the previous forge through an explicit decision."
+      }
+    ],
+    "control-phrase": "Yes, I heard the idea. No, it does not get to steal the steering wheel."
+  },
+  "suggested-data-format": {
+    "attention-document": {
+      "version": "attention-01",
+      "active-forge": "spark-guid-here",
+      "stack": [
+        {
+          "spark-guid": "spark-guid-here",
+          "lane": "forge",
+          "rank": 1,
+          "since": "2026-06-07",
+          "reason": "Active project: Shipwright / lionscliapp2.",
+          "next-action": "Define the minimal shipwright-01 JSON shape."
+        },
+        {
+          "spark-guid": "spark-guid-here",
+          "lane": "support",
+          "rank": 2,
+          "since": "2026-06-07",
+          "reason": "Useful only insofar as it supports the active forge.",
+          "next-action": "Capture supporting checklist items without implementing them yet."
+        },
+        {
+          "spark-guid": "spark-guid-here",
+          "lane": "watcher",
+          "rank": 3,
+          "since": "2026-06-07",
+          "reason": "Emotionally loud but not actionable today.",
+          "next-action": "Revisit during review, not during the active work session."
+        }
+      ],
+      "parking-lot": [
+        {
+          "spark-guid": "spark-guid-here",
+          "reason": "Good idea, but not allowed to draw heat today."
+        }
+      ]
+    }
+  },
+  "file-architecture": {
+    "recommended-files": [
+      {
+        "filename": "spark.json",
+        "purpose": "Durable registry of sparks by GUID."
+      },
+      {
+        "filename": "attention.json",
+        "purpose": "Current ordered references to spark GUIDs, representing the attention stack."
+      },
+      {
+        "filename": "session.json",
+        "purpose": "Current work-session state, including intention, active task, interruptions, and return point."
+      },
+      {
+        "filename": "today.json",
+        "purpose": "Optional daily attention and work log."
+      }
+    ],
+    "design-note": "The attention file should reference sparks by GUID rather than duplicating spark content. This keeps spark identity stable while allowing attention state to change quickly."
+  },
+  "user-interface-ideas": {
+    "spark-list": [
+      "Show all known sparks.",
+      "Indicate attention role with a small badge or lane marker.",
+      "Allow sorting by title, status, date, or current attention rank."
+    ],
+    "capture-attention-button": {
+      "label": "Capture Attention",
+      "behavior": "Open a small dialog that asks why the spark is pulling attention and what the smallest safe capture should be."
+    },
+    "attention-stack-view": [
+      "Show the current forge at the top.",
+      "Show support sparks beneath it.",
+      "Show watchers separately from parked sparks.",
+      "Make it visually obvious that only one spark is the active forge."
+    ],
+    "ritual-dialog": {
+      "title": "Capture Attention",
+      "fields": [
+        {
+          "name": "attention-reason",
+          "prompt": "Why is this trying to capture attention?"
+        },
+        {
+          "name": "smallest-safe-capture",
+          "prompt": "What is the smallest safe capture?",
+          "choices": [
+            "add-note-only",
+            "put-in-parking-lot",
+            "promote-to-support",
+            "promote-to-forge"
+          ]
+        }
+      ]
+    }
+  },
+  "current-example-reading": {
+    "forge": [
+      {
+        "spark-title": "Lion's CLI App v2",
+        "reason": "This appears to be the active framework project and the strongest candidate for the current forge."
+      }
+    ],
+    "support": [
+      {
+        "spark-title": "Project Starter Checklist Tool",
+        "reason": "This may support the forge by making project activation faster, but should not become the main build unless explicitly promoted."
+      }
+    ],
+    "watchers": [
+      {
+        "spark-title": "Lighthouse for my Work",
+        "reason": "This is strategically meaningful and emotionally bright, but may become a distraction if it pulls attention before there is work to point toward."
+      },
+      {
+        "spark-title": "Attention Drift / Ubiquitous Silk Road",
+        "reason": "This is directly relevant to the attention problem, but should be captured as theory or design support rather than becoming a separate active project today."
+      }
+    ],
+    "parked": [
+      {
+        "spark-title": "Squirrel House Business",
+        "reason": "Delightful and possibly valuable, but not part of the active forge."
+      }
+    ]
+  },
+  "operating-principles": [
+    {
+      "principle": "Infinite sparks, one active forge.",
+      "explanation": "The system should welcome unlimited possibility while protecting implementation from fragmentation."
+    },
+    {
+      "principle": "Capture is not commitment.",
+      "explanation": "Writing down a spark or adding it to the attention layer does not mean work has begun."
+    },
+    {
+      "principle": "Promotion must be explicit.",
+      "explanation": "A spark should not become active work merely because it is vivid, exciting, or emotionally loud."
+    },
+    {
+      "principle": "Support must serve the forge.",
+      "explanation": "A support spark is allowed to draw attention only when it directly helps the active forge."
+    },
+    {
+      "principle": "Parking is honorable.",
+      "explanation": "A parked spark is not rejected. It is preserved without being allowed to seize the steering wheel."
+    },
+    {
+      "principle": "The system protects joy.",
+      "explanation": "The goal is not to reduce excitement. The goal is to route excitement into finished artifacts."
+    }
+  ],
+  "aphorisms": [
+    "I am allowed infinite sparks, but only one active forge.",
+    "Capture everything. Build one thing.",
+    "A spark may be heard without being obeyed.",
+    "The forge has one mouth.",
+    "The dangerous moment is when a spark silently promotes itself into command.",
+    "Spark catches possibility. Attention governs permission.",
+    "Yes, I heard the idea. No, it does not get to steal the steering wheel."
+  ],
+  "open-questions": [
+    "Should attention roles live only in attention.json, or should the spark registry cache the current role for display speed?",
+    "Should attention changes be logged historically?",
+    "Should the system support multiple named attention stacks, such as work, home, spiritual, writing, and business?",
+    "Should the attention stack be global, per-day, or per-work-session?",
+    "Should a parked spark have a review date?",
+    "Should promoting a new forge require explicitly demoting the old forge?"
+  ],
+  "next-actions": [
+    "Add GUIDs to all spark records if they do not already have them.",
+    "Create an attention.json file that references spark GUIDs.",
+    "Add a visible attention lane or badge to the Spark UI.",
+    "Add a Capture Attention button to the spark detail view.",
+    "Implement the smallest possible attention-stack view: Forge, Support, Watcher, Parked.",
+    "Do not build a complicated productivity system before the basic spark registry and attention stack are working."
+  ]
+}
