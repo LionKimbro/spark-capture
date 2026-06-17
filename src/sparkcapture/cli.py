@@ -136,7 +136,7 @@ def run_browser(sparks_dir):
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    sort_state = {"field": None, "reverse": False}
+    sort_state = {"field": "date", "reverse": True}
 
     tree = ttk.Treeview(frame, columns=("date", "title", "hook"), show="headings")
     tree.column("date", width=140, anchor="w")
