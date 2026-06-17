@@ -136,11 +136,12 @@ def run_browser(sparks_dir):
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    tree = ttk.Treeview(frame, columns=("title", "hook"), show="headings")
-    tree.heading("title", text="Title")
-    tree.heading("hook", text="Hook")
-    tree.column("title", width=280, anchor="w")
-    tree.column("hook", width=560, anchor="w")
+    sort_state = {"field": None, "reverse": False}
+
+    tree = ttk.Treeview(frame, columns=("date", "title", "hook"), show="headings")
+    tree.column("date", width=140, anchor="w")
+    tree.column("title", width=260, anchor="w")
+    tree.column("hook", width=500, anchor="w")
 
     scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -153,14 +154,38 @@ def run_browser(sparks_dir):
     ttk.Button(button_row, text="New", command=lambda: open_editor_window(root, None, sparks_dir, refresh)).pack(side="left")
     ttk.Button(button_row, text="Refresh", command=lambda: refresh()).pack(side="left", padx=(8, 0))
 
+    def set_sort(field):
+        if sort_state["field"] == field:
+            sort_state["reverse"] = not sort_state["reverse"]
+        else:
+            sort_state["field"] = field
+            sort_state["reverse"] = field == "date"
+        refresh()
+
+    def refresh_headings():
+        for field, label in (("date", "Date"), ("title", "Title"), ("hook", "Hook")):
+            marker = ""
+            if sort_state["field"] == field:
+                marker = " v" if sort_state["reverse"] else " ^"
+            tree.heading(field, text=f"{label}{marker}", command=lambda item=field: set_sort(item))
+
     def refresh():
         selection = tree.selection()
         selected_uuid = selection[0] if selection else None
         tree.delete(*tree.get_children())
-        for payload in load_spark_payloads(sparks_dir):
+        payloads = load_spark_payloads(sparks_dir)
+        if sort_state["field"]:
+            payloads = sorted(
+                payloads,
+                key=lambda payload: spark_sort_key(payload, sort_state["field"]),
+                reverse=sort_state["reverse"],
+            )
+        refresh_headings()
+        for payload in payloads:
+            spark_date = resolve_spark_date(payload)
             title = payload.get("title", "").strip() or "(untitled)"
             hook = payload.get("hook", "").strip()
-            tree.insert("", "end", iid=payload["uuid"], values=(title, hook))
+            tree.insert("", "end", iid=payload["uuid"], values=(spark_date, title, hook))
         if selected_uuid and tree.exists(selected_uuid):
             tree.selection_set(selected_uuid)
 
@@ -649,6 +674,16 @@ def load_spark_payloads(sparks_dir):
     for path in sorted(sparks_dir.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
         payloads.append(read_json_file(path)["data"])
     return payloads
+
+
+def resolve_spark_date(payload):
+    return payload.get("date-conceived", "").strip() or payload.get("date-recorded", "").strip()
+
+
+def spark_sort_key(payload, field):
+    if field == "date":
+        return resolve_spark_date(payload).lower()
+    return payload.get(field, "").strip().lower()
 
 
 def split_tags(value):
