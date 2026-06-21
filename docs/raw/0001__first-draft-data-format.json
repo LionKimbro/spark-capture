@@ -160,6 +160,10 @@
               "type": "string",
               "description": "Free-form conceived date or time phrase."
             },
+            "last-updated": {
+              "type": "string",
+              "description": "Local date in yyyy-mm-dd form, automatically updated whenever the spark is saved."
+            },
             "status": {
               "type": "string",
               "vocabulary": {

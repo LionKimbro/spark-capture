@@ -255,6 +255,8 @@ def open_editor_window(parent, existing_data, sparks_dir, on_save=None):
     row += 1
     add_entry_row(frame, row, "date-conceived", vars_map["date-conceived"], widgets, width=30)
     row += 1
+    add_entry_row(frame, row, "last-updated", vars_map["last-updated"], widgets, width=20, readonly=True)
+    row += 1
     add_combo_row(frame, row, "status", vars_map["status"], widgets, STATUS_VALUES, width=24)
     row += 1
     add_entry_row(frame, row, "graduated-to", vars_map["graduated-to"], widgets, width=70)
@@ -344,6 +346,7 @@ def build_variables(existing_data, today, editor_state):
         "hook": StringVar(value=data.get("hook", "")),
         "date-recorded": StringVar(value=record_date),
         "date-conceived": StringVar(value=data.get("date-conceived", today)),
+        "last-updated": StringVar(value=data.get("last-updated", "")),
         "status": StringVar(value=data.get("status", STATUS_VALUES[0])),
         "graduated-to": StringVar(value=data.get("graduated-to", "")),
         "repo-path": StringVar(value=data.get("repo-path", "")),
@@ -354,11 +357,13 @@ def build_variables(existing_data, today, editor_state):
     }
 
 
-def add_entry_row(frame, row, label_text, variable, widgets, width=40, font=None):
+def add_entry_row(frame, row, label_text, variable, widgets, width=40, font=None, readonly=False):
     ttk.Label(frame, text=label_text).grid(row=row, column=0, sticky="nw", padx=(0, 12), pady=4)
     entry = ttk.Entry(frame, textvariable=variable, width=width)
     if font:
         entry.configure(font=font)
+    if readonly:
+        entry.configure(state="readonly")
     entry.grid(row=row, column=1, sticky="ew", pady=4)
     widgets[label_text] = entry
 
@@ -571,6 +576,8 @@ def save_current_spark(window, widgets, vars_map, sparks_dir, editor_state, on_s
         messagebox.showerror("spark", str(exc))
         return
 
+    payload["last-updated"] = today_string()
+    vars_map["last-updated"].set(payload["last-updated"])
     document = {
         "type": "spark-capture",
         "version": "1.0",
@@ -617,6 +624,7 @@ def collect_form_data(widgets, vars_map, sparks_dir, editor_state):
         "hook": vars_map["hook"].get().strip(),
         "date-recorded": vars_map["date-recorded"].get().strip(),
         "date-conceived": vars_map["date-conceived"].get().strip(),
+        "last-updated": vars_map["last-updated"].get().strip(),
         "status": vars_map["status"].get().strip(),
         "graduated-to": vars_map["graduated-to"].get().strip(),
         "known-records": collect_known_records(editor_state),
@@ -744,7 +752,11 @@ def load_spark_payloads(sparks_dir):
 
 
 def resolve_spark_date(payload):
-    return payload.get("date-conceived", "").strip() or payload.get("date-recorded", "").strip()
+    return (
+        payload.get("last-updated", "").strip()
+        or payload.get("date-conceived", "").strip()
+        or payload.get("date-recorded", "").strip()
+    )
 
 
 def spark_sort_key(payload, field):
