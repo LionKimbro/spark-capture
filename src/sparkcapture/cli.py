@@ -142,6 +142,8 @@ def run_browser(sparks_dir):
     tree.column("date", width=140, anchor="w")
     tree.column("title", width=260, anchor="w")
     tree.column("hook", width=500, anchor="w")
+    tree.tag_configure("formalized", foreground="#8a8a8a")
+    tree.tag_configure("repo-created", foreground="#2f6fbd")
 
     scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
@@ -185,7 +187,13 @@ def run_browser(sparks_dir):
             spark_date = resolve_spark_date(payload)
             title = payload.get("title", "").strip() or "(untitled)"
             hook = payload.get("hook", "").strip()
-            tree.insert("", "end", iid=payload["uuid"], values=(spark_date, title, hook))
+            status = payload.get("status", "").strip().lower()
+            tags = ()
+            if status == "formalized":
+                tags = ("formalized",)
+            elif status == "repo created":
+                tags = ("repo-created",)
+            tree.insert("", "end", iid=payload["uuid"], values=(spark_date, title, hook), tags=tags)
         if selected_uuid and tree.exists(selected_uuid):
             tree.selection_set(selected_uuid)
 
@@ -315,7 +323,9 @@ def build_editor_state(existing_data):
         "known-record-rows": [],
         "known-record-button": None,
         "conversation-rows": [],
+        "conversation-button": None,
         "related-project-rows": [],
+        "related-project-button": None,
         "status-var": None,
     }
 
@@ -333,7 +343,7 @@ def build_variables(existing_data, today, editor_state):
         "tags": StringVar(value=" ".join(data.get("tags", []))),
         "hook": StringVar(value=data.get("hook", "")),
         "date-recorded": StringVar(value=record_date),
-        "date-conceived": StringVar(value=data.get("date-conceived", "")),
+        "date-conceived": StringVar(value=data.get("date-conceived", today)),
         "status": StringVar(value=data.get("status", STATUS_VALUES[0])),
         "graduated-to": StringVar(value=data.get("graduated-to", "")),
         "repo-path": StringVar(value=data.get("repo-path", "")),
@@ -458,23 +468,55 @@ def add_conversations_section(frame, row, conversations, editor_state):
     ttk.Label(frame, text="conversations").grid(row=row, column=0, sticky="nw", padx=(0, 12), pady=(10, 4))
     section = ttk.Frame(frame)
     section.grid(row=row, column=1, sticky="ew")
-    editor_state["conversation-rows"] = []
-    for index, conversation in enumerate(conversations, start=1):
-        url_var = StringVar(value=conversation.get("url", ""))
-        hook_var = StringVar(value=conversation.get("hook", ""))
-        ttk.Label(section, text=f"url {index}").grid(row=(index - 1) * 2, column=0, sticky="w", pady=2)
-        ttk.Entry(section, textvariable=url_var, width=58).grid(row=(index - 1) * 2, column=1, sticky="ew", pady=2)
-        ttk.Button(section, text="Open", command=lambda var=url_var: open_target(var.get().strip())).grid(
-            row=(index - 1) * 2,
-            column=2,
-            padx=(8, 0),
-            pady=2,
-        )
-        ttk.Label(section, text=f"hook {index}").grid(row=(index - 1) * 2 + 1, column=0, sticky="w", pady=2)
-        ttk.Entry(section, textvariable=hook_var, width=58).grid(row=(index - 1) * 2 + 1, column=1, columnspan=2, sticky="ew", pady=2)
-        editor_state["conversation-rows"].append({"url": url_var, "hook": hook_var})
     section.columnconfigure(1, weight=1)
+    editor_state["conversation-rows"] = []
+    for conversation in conversations:
+        add_conversation_row(section, conversation, editor_state)
+    editor_state["conversation-button"] = ttk.Button(
+        section,
+        text="Add conversation",
+        command=lambda: add_conversation_row(section, None, editor_state),
+    )
+    refresh_conversation_button(editor_state)
     return row + 1
+
+
+def add_conversation_row(section, conversation, editor_state):
+    index = len(editor_state["conversation-rows"])
+    conversation = conversation or {"url": "", "hook": ""}
+    grid_row = index * 2
+
+    url_var = StringVar(value=conversation.get("url", ""))
+    hook_var = StringVar(value=conversation.get("hook", ""))
+    ttk.Label(section, text=f"url {index + 1}").grid(row=grid_row, column=0, sticky="w", pady=2)
+    ttk.Entry(section, textvariable=url_var, width=58).grid(row=grid_row, column=1, sticky="ew", pady=2)
+    ttk.Button(section, text="Open", command=lambda: open_target(url_var.get().strip())).grid(
+        row=grid_row,
+        column=2,
+        padx=(8, 0),
+        pady=2,
+    )
+    ttk.Label(section, text=f"hook {index + 1}").grid(row=grid_row + 1, column=0, sticky="w", pady=2)
+    ttk.Entry(section, textvariable=hook_var, width=58).grid(
+        row=grid_row + 1,
+        column=1,
+        columnspan=2,
+        sticky="ew",
+        pady=2,
+    )
+    editor_state["conversation-rows"].append({"url": url_var, "hook": hook_var})
+    refresh_conversation_button(editor_state)
+
+
+def refresh_conversation_button(editor_state):
+    if editor_state["conversation-button"] is None:
+        return
+    editor_state["conversation-button"].grid(
+        row=len(editor_state["conversation-rows"]) * 2,
+        column=0,
+        sticky="w",
+        pady=(6, 0),
+    )
 
 
 def add_related_projects_section(frame, row, related_projects, editor_state):
@@ -483,18 +525,43 @@ def add_related_projects_section(frame, row, related_projects, editor_state):
     section.grid(row=row, column=1, sticky="ew")
     section.columnconfigure(1, weight=1)
     editor_state["related-project-rows"] = []
-    for index, related_project in enumerate(related_projects, start=1):
-        project_var = StringVar(value=related_project.get("project", ""))
-        ttk.Label(section, text=f"project {index}").grid(row=index - 1, column=0, sticky="w", pady=2)
-        ttk.Entry(section, textvariable=project_var, width=36).grid(row=index - 1, column=1, sticky="ew", pady=2)
-        ttk.Button(section, text="Open", command=lambda var=project_var: open_related_project(var.get().strip())).grid(
-            row=index - 1,
-            column=2,
-            padx=(8, 0),
-            pady=2,
-        )
-        editor_state["related-project-rows"].append({"project": project_var})
+    for related_project in related_projects:
+        add_related_project_row(section, related_project, editor_state)
+    editor_state["related-project-button"] = ttk.Button(
+        section,
+        text="Add related project",
+        command=lambda: add_related_project_row(section, None, editor_state),
+    )
+    refresh_related_project_button(editor_state)
     return row + 1
+
+
+def add_related_project_row(section, related_project, editor_state):
+    index = len(editor_state["related-project-rows"])
+    related_project = related_project or {"project": ""}
+
+    project_var = StringVar(value=related_project.get("project", ""))
+    ttk.Label(section, text=f"project {index + 1}").grid(row=index, column=0, sticky="w", pady=2)
+    ttk.Entry(section, textvariable=project_var, width=36).grid(row=index, column=1, sticky="ew", pady=2)
+    ttk.Button(section, text="Open", command=lambda: open_related_project(project_var.get().strip())).grid(
+        row=index,
+        column=2,
+        padx=(8, 0),
+        pady=2,
+    )
+    editor_state["related-project-rows"].append({"project": project_var})
+    refresh_related_project_button(editor_state)
+
+
+def refresh_related_project_button(editor_state):
+    if editor_state["related-project-button"] is None:
+        return
+    editor_state["related-project-button"].grid(
+        row=len(editor_state["related-project-rows"]),
+        column=0,
+        sticky="w",
+        pady=(6, 0),
+    )
 
 
 def save_current_spark(window, widgets, vars_map, sparks_dir, editor_state, on_save=None):
