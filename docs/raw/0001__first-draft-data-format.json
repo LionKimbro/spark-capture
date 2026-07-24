@@ -105,18 +105,15 @@
           "keys": {
             "type": {
               "type": "string",
+              "const": "spark-capture",
               "required": true,
-              "description": "Fixed wrapper type name.",
-              "examples": [
-                "spark-capture"
-              ]
+              "description": "Fixed wrapper type name."
             },
             "version": {
               "type": "string",
+              "const": "1.0",
               "required": true,
-              "examples": [
-                "1.0"
-              ]
+              "description": "Fixed data-format version."
             },
             "data": {
               "ref": "spark-payload",
@@ -133,12 +130,10 @@
           "type": "object",
           "keys": {
             "uuid": {
-              "ref": "uuid",
-              "required": true
+              "ref": "uuid"
             },
             "title": {
               "type": "string",
-              "required": true,
               "description": "Human title of the spark."
             },
             "tags": {
@@ -235,6 +230,7 @@
       "hook": "tiny form for catching project sparks",
       "date-recorded": "2026-06-06",
       "date-conceived": "Spring, 2026",
+      "last-updated": "2026-06-06",
       "status": "conceived",
       "graduated-to": "",
       "known-records": [
