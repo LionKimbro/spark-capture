@@ -1,0 +1,15 @@
+{
+  "id": "spark-capture",
+  "identity": {
+    "name": "spark-capture",
+    "title": "Spark Capture",
+    "tags": [
+      "spark",
+      "project",
+      "projectmemory",
+      "ideas",
+      "ideation"
+    ],
+    "hook": "quickly capture new ideas and get projects into rapid motion"
+  }
+}
