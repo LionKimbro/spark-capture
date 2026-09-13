@@ -134,9 +134,18 @@ def run_browser(sparks_dir):
     frame = ttk.Frame(root, padding=12)
     frame.pack(fill="both", expand=True)
     frame.columnconfigure(0, weight=1)
-    frame.rowconfigure(0, weight=1)
+    frame.rowconfigure(1, weight=1)
 
     sort_state = {"field": "date", "reverse": True}
+    tag_search_var = StringVar()
+    search_refresh_id = None
+
+    search_row = ttk.Frame(frame)
+    search_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+    search_row.columnconfigure(1, weight=1)
+    ttk.Label(search_row, text="Search tags:").grid(row=0, column=0, sticky="w", padx=(0, 8))
+    tag_search_entry = ttk.Entry(search_row, textvariable=tag_search_var)
+    tag_search_entry.grid(row=0, column=1, sticky="ew")
 
     tree = ttk.Treeview(frame, columns=("date", "title", "hook"), show="headings")
     tree.column("date", width=140, anchor="w")
@@ -148,11 +157,11 @@ def run_browser(sparks_dir):
     scrollbar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
 
-    tree.grid(row=0, column=0, sticky="nsew")
-    scrollbar.grid(row=0, column=1, sticky="ns")
+    tree.grid(row=1, column=0, sticky="nsew")
+    scrollbar.grid(row=1, column=1, sticky="ns")
 
     button_row = ttk.Frame(frame)
-    button_row.grid(row=1, column=0, sticky="w", pady=(10, 0))
+    button_row.grid(row=2, column=0, sticky="w", pady=(10, 0))
     ttk.Button(button_row, text="New", command=lambda: open_editor_window(root, None, sparks_dir, refresh)).pack(side="left")
     ttk.Button(button_row, text="Refresh", command=lambda: refresh()).pack(side="left", padx=(8, 0))
 
@@ -176,6 +185,9 @@ def run_browser(sparks_dir):
         selected_uuid = selection[0] if selection else None
         tree.delete(*tree.get_children())
         payloads = load_spark_payloads(sparks_dir)
+        payloads = [
+            payload for payload in payloads if payload_matches_tag_search(payload, tag_search_var.get())
+        ]
         if sort_state["field"]:
             payloads = sorted(
                 payloads,
@@ -197,6 +209,17 @@ def run_browser(sparks_dir):
         if selected_uuid and tree.exists(selected_uuid):
             tree.selection_set(selected_uuid)
 
+    def refresh_after_tag_search():
+        nonlocal search_refresh_id
+        search_refresh_id = None
+        refresh()
+
+    def schedule_tag_search_refresh(*_):
+        nonlocal search_refresh_id
+        if search_refresh_id is not None:
+            root.after_cancel(search_refresh_id)
+        search_refresh_id = root.after(1000, refresh_after_tag_search)
+
     def open_selected(event=None):
         selection = tree.selection()
         if not selection:
@@ -206,6 +229,7 @@ def run_browser(sparks_dir):
         open_editor_window(root, existing_data, sparks_dir, refresh)
 
     tree.bind("<Double-1>", open_selected)
+    tag_search_var.trace_add("write", schedule_tag_search_refresh)
     refresh()
 
     def schedule_refresh():
@@ -767,6 +791,15 @@ def spark_sort_key(payload, field):
 
 def split_tags(value):
     return [tag for tag in value.split() if tag]
+
+
+def payload_matches_tag_search(payload, search_text):
+    search_terms = search_text.casefold().split()
+    if not search_terms:
+        return True
+
+    tags = [str(tag).casefold() for tag in payload.get("tags", [])]
+    return all(any(term in tag for tag in tags) for term in search_terms)
 
 
 def read_text_widget(widget):
